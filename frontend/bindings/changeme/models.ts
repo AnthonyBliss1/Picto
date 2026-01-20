@@ -6,34 +6,34 @@
 import { Create as $Create } from "@wailsio/runtime";
 
 export class Room {
-  "HostName": string;
-  "Addr": string;
-  "Port": number;
-  "URL": string;
+    "hostname": string;
+    "addr": string;
+    "port": number;
+    "url": string;
 
-  /** Creates a new Room instance. */
-  constructor($$source: Partial<Room> = {}) {
-    if (!("HostName" in $$source)) {
-      this["HostName"] = "";
-    }
-    if (!("Addr" in $$source)) {
-      this["Addr"] = "";
-    }
-    if (!("Port" in $$source)) {
-      this["Port"] = 0;
-    }
-    if (!("URL" in $$source)) {
-      this["URL"] = "";
+    /** Creates a new Room instance. */
+    constructor($$source: Partial<Room> = {}) {
+        if (!("hostname" in $$source)) {
+            this["hostname"] = "";
+        }
+        if (!("addr" in $$source)) {
+            this["addr"] = "";
+        }
+        if (!("port" in $$source)) {
+            this["port"] = 0;
+        }
+        if (!("url" in $$source)) {
+            this["url"] = "";
+        }
+
+        Object.assign(this, $$source);
     }
 
-    Object.assign(this, $$source);
-  }
-
-  /**
-   * Creates a new Room instance from a string or object.
-   */
-  static createFrom($$source: any = {}): Room {
-    let $$parsedSource = typeof $$source === "string" ? JSON.parse($$source) : $$source;
-    return new Room($$parsedSource as Partial<Room>);
-  }
+    /**
+     * Creates a new Room instance from a string or object.
+     */
+    static createFrom($$source: any = {}): Room {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new Room($$parsedSource as Partial<Room>);
+    }
 }

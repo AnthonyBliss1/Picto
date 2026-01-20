@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -19,15 +22,18 @@ const (
 )
 
 type Room struct {
-	HostName string
-	Addr     string
-	Port     int
-	URL      string
+	HostName string `json:"hostname"`
+	Addr     string `json:"addr"`
+	Port     int    `json:"port"`
+	URL      string `json:"url"`
 }
 
 type Picto struct {
-	RoomChoice     *RoomChoice
-	AvailableRooms []Room
+	RoomChoice     *RoomChoice  `json:"roomChoice"`
+	AvailableRooms []Room       `json:"availableRooms"`
+	CurrentRoom    *Room        `json:"currentRoom"`
+	IsHost         bool         `json:"isHost"`
+	MDNSServer     *mdns.Server `json:"mdnsServer"`
 
 	Mu sync.Mutex
 }
@@ -42,6 +48,9 @@ func (p *Picto) String() string {
 	return string(j)
 }
 
+// Handling Rooms
+// ~~~~~~~~~~~~~~~~~~~
+
 func (p *Picto) GetAvailableRooms() []Room {
 	p.Mu.Lock()
 	defer p.Mu.Unlock()
@@ -52,7 +61,47 @@ func (p *Picto) GetAvailableRooms() []Room {
 	return out
 }
 
-func (p *Picto) MDNSLookup() {
+func (p *Picto) GetCurrentroom() *Room {
+	return p.CurrentRoom
+}
+
+func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
+	if isUserHost {
+
+		hostName, err := os.Hostname()
+		if err != nil {
+			slog.Error("Failed to get user hostName", err)
+			return err
+		}
+
+		url := url.URL{
+			Scheme: "ws",
+			Host:   hostName,
+			Path:   "/draw",
+		}
+
+		userHost := Room{HostName: hostName, Addr: "0.0.0.0", Port: 8000, URL: url.String()}
+		p.CurrentRoom = &userHost
+
+	} else {
+		p.CurrentRoom = r
+	}
+
+	return nil
+}
+
+func (p *Picto) GetIsHost() bool {
+	return p.IsHost
+}
+
+func (p *Picto) SetIsHost(b bool) {
+	p.IsHost = b
+}
+
+// Handling MDNS Server
+// ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+func (p *Picto) MDNSLookup() error {
 	entriesCH := make(chan *mdns.ServiceEntry, 4)
 	newRooms := []Room{}
 
@@ -66,7 +115,7 @@ func (p *Picto) MDNSLookup() {
 				continue
 			}
 
-			slog.Info("Found new entry:", entry)
+			slog.Debug("MDNS Lookup", "Found new entry", entry.Name)
 
 			room := Room{HostName: entry.Host, Addr: entry.AddrV4.String(), Port: entry.Port}
 			room.URL = fmt.Sprintf("ws://%s:%d/ws", room.Addr, room.Port)
@@ -77,6 +126,43 @@ func (p *Picto) MDNSLookup() {
 		p.Mu.Unlock()
 	}()
 
-	mdns.Lookup("_pictosvelte._tcp", entriesCH)
+	if err := mdns.Lookup("_pictosvelte._tcp", entriesCH); err != nil {
+		return err
+	}
+
 	close(entriesCH)
+
+	return nil
+}
+
+func (p *Picto) StartMDNS() {
+	hostName, _ := os.Hostname()
+
+	info := []string{"Picto Server"}
+	service, _ := mdns.NewMDNSService(hostName, "_pictosvelte._tcp", "", "", 8000, nil, info)
+
+	slog.Debug("Starting MDNS Server...")
+	p.MDNSServer, _ = mdns.NewServer(&mdns.Config{Zone: service})
+
+	go func() {
+		p.StartWsServer()
+	}()
+}
+
+// Handling WS Server
+// ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+func (p *Picto) StartWsServer() {
+	mux := http.NewServeMux()
+	// mux.HandleFunc("/ws", p.HandleConnections)
+
+	server := &http.Server{
+		Addr:    "0.0.0.0:8000",
+		Handler: mux,
+	}
+
+	slog.Debug("Started WebSocket Server on :8000")
+	if err := server.ListenAndServe(); err != nil {
+		log.Printf("server shutdown error: %v\n", err)
+	}
 }

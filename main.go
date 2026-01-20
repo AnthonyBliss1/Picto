@@ -33,7 +33,7 @@ func main() {
 	// 'Bind' is a list of Go struct instances. The frontend has access to the methods of these instances.
 	// 'Mac' options tailor the application when running an macOS.
 	app := application.New(application.Options{
-		Name:        "Picto-Svelte",
+		Name:        "Picto",
 		Description: "A simple doodle tool with WebSockets",
 		Services:    []application.Service{application.NewService(&Picto{})},
 		Assets: application.AssetOptions{
@@ -50,13 +50,13 @@ func main() {
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "Marza.io",
+		Title: "Picto",
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
 			Backdrop:                application.MacBackdropTranslucent,
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
-		BackgroundColour: application.NewRGB(2, 6, 24),
+		BackgroundColour: application.NewRGB(10, 10, 10),
 		URL:              "/",
 	})
 
