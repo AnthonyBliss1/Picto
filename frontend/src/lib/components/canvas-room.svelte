@@ -5,6 +5,17 @@
   let { isHost = $bindable<boolean>(false) } = $props<{ isHost: boolean }>();
   let room: Room | null = $state(null);
 
+  let canvasEl: HTMLCanvasElement | null = $state(null);
+  let ctx: CanvasRenderingContext2D | null = $state(null);
+  let cleanupCanvas: (() => void) | undefined;
+  let didInit: boolean = $state(false);
+
+  let isDrawing = $state(false);
+  let color = $state("#ffffff");
+  let lineWidth = $state(10);
+
+  let isEraser = $state(false);
+
   async function getCurrentRoom() {
     try {
       room = await Picto.GetCurrentroom();
@@ -24,6 +35,108 @@
     }
   }
 
+  function applyStrokeStyle() {
+    if (!ctx) return;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = color;
+    ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+  }
+
+  function getPoint(e: PointerEvent) {
+    if (!canvasEl) return { x: 0, y: 0 };
+    const rect = canvasEl.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function startDraw(e: PointerEvent) {
+    if (!ctx || !canvasEl) {
+      console.log("No canvasEL or ctx...");
+      return;
+    }
+
+    canvasEl.setPointerCapture(e.pointerId);
+    isDrawing = true;
+    console.log("Drawing...");
+
+    const p = getPoint(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+
+  function moveDraw(e: PointerEvent) {
+    if (!ctx || !isDrawing) return;
+
+    const p = getPoint(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+
+  function endDraw(e: PointerEvent) {
+    if (!ctx || !canvasEl) return;
+
+    isDrawing = false;
+    try {
+      canvasEl.releasePointerCapture(e.pointerId);
+    } catch {}
+    ctx.closePath();
+  }
+
+  function clearCanvas() {
+    if (!ctx || !canvasEl) return;
+    const { width, height } = canvasEl.getBoundingClientRect();
+    ctx.clearRect(0, 0, width, height);
+  }
+
+  function setupCanvas() {
+    if (!canvasEl) {
+      console.log("No canvasEl... can't setupCanvas");
+      return;
+    }
+
+    ctx = canvasEl.getContext("2d");
+    if (!ctx) return;
+
+    didInit = true;
+
+    const resize = () => {
+      if (!canvasEl || !ctx) return;
+
+      const rect = canvasEl.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      // Set drawing buffer size (physical pixels)
+      canvasEl.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvasEl.height = Math.max(1, Math.floor(rect.height * dpr));
+
+      // Draw using CSS pixel coordinates
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      applyStrokeStyle();
+    };
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvasEl);
+
+    resize();
+
+    return () => ro.disconnect();
+  }
+
+  $effect(() => {
+    if (!canvasEl || didInit) return;
+
+    console.log("Running cleanup...");
+
+    cleanupCanvas?.();
+    cleanupCanvas = setupCanvas();
+  });
+
+  $effect(() => {
+    applyStrokeStyle();
+  });
+
   onMount(() => {
     getCurrentRoom();
 
@@ -34,38 +147,89 @@
 </script>
 
 {#if room}
-  <div
-    class="bg-card border-border mr-3 ml-3 flex translate-y-3 flex-row justify-between rounded-md border px-12 py-2"
-  >
-    <div class="flex flex-row items-center gap-8">
-      <div class="flex flex-col items-center">
-        <p>Menu</p>
-        <p>[ M ]</p>
+  <div class="relative h-full w-full">
+    <!--> Canvas Object to handle drawing <--->
+    <canvas
+      class="bg-background absolute z-0 h-full w-full"
+      bind:this={canvasEl}
+      onpointerdown={startDraw}
+      onpointermove={moveDraw}
+      onpointerup={endDraw}
+      onpointercancel={endDraw}
+      onpointerleave={endDraw}
+    ></canvas>
+
+    <!--> Top Toolbar <--->
+    <div
+      class="bg-card border-border relative z-50 mr-3 ml-3 flex translate-y-3 flex-row justify-between rounded-md border px-12 py-2"
+    >
+      <div class="flex flex-row items-center gap-8">
+        <div class="flex flex-col items-center">
+          <p>Menu</p>
+          <p>[ M ]</p>
+        </div>
+
+        <div class="flex flex-col items-center justify-center">
+          <p>Clear Canvas</p>
+          <p>[ Space ]</p>
+        </div>
       </div>
 
-      <div class="flex flex-col items-center justify-center">
-        <p>Clear Canvas</p>
-        <p>[ Space ]</p>
+      <div class="flex flex-row items-center gap-20">
+        <p class="italic">Host: {room.hostname}</p>
+        <p>Users: ?</p>
       </div>
     </div>
 
-    <div class="flex flex-row items-center gap-20">
-      <p class="italic">Host: {room.hostname}</p>
-      <p>Users: 100</p>
+    <!--> Bottom Draw Size Selector <--->
+    <div
+      class="bg-card border-border fixed bottom-3 left-3 z-50 flex items-center justify-end gap-10 rounded-md border px-5 py-2"
+    >
+      <svg
+        class="h-15 w-15"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        onclick={() => {
+          lineWidth = 15;
+        }}
+      >
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          class={`hover:fill-blue-700 ${lineWidth === 15 ? `fill-blue-700` : `fill-white`}`}
+        />
+      </svg>
+      <svg
+        class="h-10 w-10"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        onclick={() => {
+          lineWidth = 10;
+        }}
+      >
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          class={`hover:fill-blue-700 ${lineWidth === 10 ? `fill-blue-700` : `fill-white`}`}
+        />
+      </svg>
+      <svg
+        class="h-5 w-5"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        onclick={() => {
+          lineWidth = 5;
+        }}
+      >
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          class={`hover:fill-blue-700 ${lineWidth === 5 ? `fill-blue-700` : `fill-white`}`}
+        />
+      </svg>
     </div>
-  </div>
-
-  <div
-    class="bg-card border-border fixed bottom-3 left-3 z-50 flex items-center justify-end gap-10 rounded-md border px-5 py-2"
-  >
-    <svg class="h-15 w-15" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" class="fill-white hover:fill-blue-700" />
-    </svg>
-    <svg class="h-10 w-10" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" class="fill-white hover:fill-blue-700" />
-    </svg>
-    <svg class="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" class="fill-white hover:fill-blue-700" />
-    </svg>
   </div>
 {/if}
