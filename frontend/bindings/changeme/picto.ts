@@ -3,50 +3,57 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Create } from "@wailsio/runtime";
+import {
+  Call as $Call,
+  CancellablePromise as $CancellablePromise,
+  Create as $Create,
+} from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 export function GetAvailableRooms(): $CancellablePromise<$models.Room[]> {
-    return $Call.ByID(2675359888).then(($result: any) => {
-        return $$createType1($result);
-    });
+  return $Call.ByID(2675359888).then(($result: any) => {
+    return $$createType1($result);
+  });
 }
 
 export function GetCurrentroom(): $CancellablePromise<$models.Room | null> {
-    return $Call.ByID(3191587921).then(($result: any) => {
-        return $$createType2($result);
-    });
+  return $Call.ByID(3191587921).then(($result: any) => {
+    return $$createType2($result);
+  });
 }
 
 export function GetIsHost(): $CancellablePromise<boolean> {
-    return $Call.ByID(2498023095);
+  return $Call.ByID(2498023095);
 }
 
 export function MDNSLookup(): $CancellablePromise<void> {
-    return $Call.ByID(2735963699);
+  return $Call.ByID(2735963699);
 }
 
-export function SetCurrentRoom(r: $models.Room | null, isUserHost: boolean): $CancellablePromise<void> {
-    return $Call.ByID(801489685, r, isUserHost);
+export function SetCurrentRoom(
+  r: $models.Room | null,
+  isUserHost: boolean,
+): $CancellablePromise<void> {
+  return $Call.ByID(801489685, r, isUserHost);
 }
 
 export function SetIsHost(b: boolean): $CancellablePromise<void> {
-    return $Call.ByID(199860811, b);
+  return $Call.ByID(199860811, b);
 }
 
-export function StartMDNS(): $CancellablePromise<void> {
-    return $Call.ByID(2485170187);
+export function StartServers(): $CancellablePromise<void> {
+  return $Call.ByID(2711609535);
 }
 
 export function StartWsServer(): $CancellablePromise<void> {
-    return $Call.ByID(1821117296);
+  return $Call.ByID(1821117296);
 }
 
 export function String(): $CancellablePromise<string> {
-    return $Call.ByID(1033622086);
+  return $Call.ByID(1033622086);
 }
 
 // Private type creation functions

@@ -6,7 +6,6 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -74,13 +73,9 @@ func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
 			return err
 		}
 
-		url := url.URL{
-			Scheme: "ws",
-			Host:   hostName,
-			Path:   "/draw",
-		}
+		url := fmt.Sprintf("ws://%s:%d/ws", "0.0.0.0", 8000)
 
-		userHost := Room{HostName: hostName, Addr: "0.0.0.0", Port: 8000, URL: url.String()}
+		userHost := Room{HostName: hostName, Addr: "0.0.0.0", Port: 8000, URL: url}
 		p.CurrentRoom = &userHost
 
 	} else {
@@ -98,7 +93,7 @@ func (p *Picto) SetIsHost(b bool) {
 	p.IsHost = b
 }
 
-// Handling MDNS Server
+// Handling MDNS Server - MDNS Advertising Port: 8000 -> WS Port: 8000
 // ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 func (p *Picto) MDNSLookup() error {
@@ -135,18 +130,25 @@ func (p *Picto) MDNSLookup() error {
 	return nil
 }
 
-func (p *Picto) StartMDNS() {
+func (p *Picto) StartServers() error {
 	hostName, _ := os.Hostname()
 
 	info := []string{"Picto Server"}
 	service, _ := mdns.NewMDNSService(hostName, "_pictosvelte._tcp", "", "", 8000, nil, info)
 
-	slog.Debug("Starting MDNS Server...")
-	p.MDNSServer, _ = mdns.NewServer(&mdns.Config{Zone: service})
+	slog.Debug("Starting MDNS Server advertising service on :8000")
+	mdnsSrv, err := mdns.NewServer(&mdns.Config{Zone: service})
+	if err != nil {
+		return err
+	}
+
+	p.MDNSServer = mdnsSrv
 
 	go func() {
 		p.StartWsServer()
 	}()
+
+	return nil
 }
 
 // Handling WS Server
@@ -161,7 +163,7 @@ func (p *Picto) StartWsServer() {
 		Handler: mux,
 	}
 
-	slog.Debug("Started WebSocket Server on :8000")
+	slog.Debug("Starting WebSocket Server on :8000")
 	if err := server.ListenAndServe(); err != nil {
 		log.Printf("server shutdown error: %v\n", err)
 	}

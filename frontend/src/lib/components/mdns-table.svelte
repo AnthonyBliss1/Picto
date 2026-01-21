@@ -7,7 +7,10 @@
   import { Picto } from "../../../bindings/changeme";
   import { Room } from "../../../bindings/changeme/models";
 
+  type RoomChoice = "create_room" | "join_room" | null;
+
   let availRooms: Room[] = $state([]);
+  let { roomChoice = $bindable<RoomChoice>("join_room") } = $props<{ roomChoice: RoomChoice }>();
 
   async function getRooms() {
     try {
@@ -19,6 +22,10 @@
       console.log(error);
       return;
     }
+  }
+
+  function onBack() {
+    roomChoice = null;
   }
 
   onMount(() => {
@@ -71,4 +78,5 @@
       {/if}
     </div>
   </div>
+  <Button class="p-5 text-lg" variant="outline" onclick={onBack}>Back</Button>
 </div>
