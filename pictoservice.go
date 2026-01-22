@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/hashicorp/mdns"
 )
 
@@ -31,10 +32,10 @@ type Picto struct {
 	RoomChoice     *RoomChoice  `json:"roomChoice"`
 	AvailableRooms []Room       `json:"availableRooms"`
 	CurrentRoom    *Room        `json:"currentRoom"`
-	IsHost         bool         `json:"isHost"`
-	MDNSServer     *mdns.Server `json:"mdnsServer"`
+	MDNSServer     *mdns.Server `json:"mdnsServer"` // ? might remove
 
-	Mu sync.Mutex
+	Hub *Hub `json:"hub"`
+	Mu  sync.Mutex
 }
 
 func init() {
@@ -69,7 +70,7 @@ func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
 
 		hostName, err := os.Hostname()
 		if err != nil {
-			slog.Error("Failed to get user hostName", err)
+			slog.Error("Failed to get user hostName", "Error", err)
 			return err
 		}
 
@@ -77,6 +78,7 @@ func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
 
 		userHost := Room{HostName: hostName, Addr: "0.0.0.0", Port: 8000, URL: url}
 		p.CurrentRoom = &userHost
+		p.Hub = NewHub() // assign a hub for the host
 
 	} else {
 		p.CurrentRoom = r
@@ -85,12 +87,17 @@ func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
 	return nil
 }
 
-func (p *Picto) GetIsHost() bool {
-	return p.IsHost
-}
+func (p *Picto) IsHost() bool {
+	switch {
+	case p.Hub != nil:
+		return true
 
-func (p *Picto) SetIsHost(b bool) {
-	p.IsHost = b
+	case p.Hub == nil:
+		return false
+
+	default:
+		return false
+	}
 }
 
 // Handling MDNS Server - MDNS Advertising Port: 8000 -> WS Port: 8000
@@ -151,12 +158,74 @@ func (p *Picto) StartServers() error {
 	return nil
 }
 
-// Handling WS Server
+// Handling WS Server - Client, Hub, and Messages
 // ~~~~~~~~~~~~~~~~~~~~~~~~~
 
+type Message struct {
+	Action      string      `json:"action"`
+	Points      map[int]int `json:"points"`
+	StrokeWidth int         `json:"strokeWidth"`
+	Color       string      `json:"color"`
+}
+
+type Client struct {
+	hub  *Hub
+	conn *websocket.Conn
+	send chan Message
+}
+
+type Hub struct {
+	Clients    map[*Client]bool
+	Broadcast  chan Message
+	Register   chan *Client
+	Unregister chan *Client
+}
+
+func NewHub() *Hub {
+	return &Hub{
+		Clients:    make(map[*Client]bool),
+		Broadcast:  make(chan Message),
+		Register:   make(chan *Client),
+		Unregister: make(chan *Client),
+	}
+}
+
+func (h *Hub) Run() {
+	for {
+		select {
+		case client := <-h.Register:
+			h.Clients[client] = true
+
+		case client := <-h.Unregister:
+			if _, ok := h.Clients[client]; ok {
+				delete(h.Clients, client)
+				close(client.send)
+			}
+
+		case msg := <-h.Broadcast:
+			for client := range h.Clients {
+				select {
+				case client.send <- msg:
+				default:
+					close(client.send)
+					delete(h.Clients, client)
+				}
+			}
+		}
+	}
+}
+
 func (p *Picto) StartWsServer() {
+	if p.Hub == nil {
+		return
+	}
+
+	go p.Hub.Run()
+
 	mux := http.NewServeMux()
-	// mux.HandleFunc("/ws", p.HandleConnections)
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ServeWs(p.Hub, w, r)
+	})
 
 	server := &http.Server{
 		Addr:    "0.0.0.0:8000",
@@ -165,6 +234,80 @@ func (p *Picto) StartWsServer() {
 
 	slog.Debug("Starting WebSocket Server on :8000")
 	if err := server.ListenAndServe(); err != nil {
-		log.Printf("server shutdown error: %v\n", err)
+		slog.Error("Server shutdown error", "Error", err)
+	}
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("Error upgrading Http to WS", "Error", err)
+		return
+	}
+	client := &Client{hub: hub, conn: conn, send: make(chan Message)}
+	client.hub.Register <- client
+
+	go client.writePump()
+	go client.readPump()
+}
+
+// Handling Read and Writes to WS
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+const (
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+)
+
+func (c *Client) readPump() {
+	defer func() {
+		c.hub.Unregister <- c
+		c.conn.Close()
+	}()
+
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+
+	for {
+		var msg *Message
+
+		err := c.conn.ReadJSON(&msg)
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				slog.Error("WebSocket Error", "Error", err)
+			}
+			break
+		}
+		c.hub.Broadcast <- *msg
+	}
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+	for {
+		select {
+		case msg, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if !ok {
+				return
+			}
+
+			c.conn.WriteJSON(&msg)
+
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
 	}
 }

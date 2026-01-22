@@ -25,8 +25,8 @@ export function GetCurrentroom(): $CancellablePromise<$models.Room | null> {
   });
 }
 
-export function GetIsHost(): $CancellablePromise<boolean> {
-  return $Call.ByID(2498023095);
+export function IsHost(): $CancellablePromise<boolean> {
+  return $Call.ByID(1427711681);
 }
 
 export function MDNSLookup(): $CancellablePromise<void> {
@@ -38,10 +38,6 @@ export function SetCurrentRoom(
   isUserHost: boolean,
 ): $CancellablePromise<void> {
   return $Call.ByID(801489685, r, isUserHost);
-}
-
-export function SetIsHost(b: boolean): $CancellablePromise<void> {
-  return $Call.ByID(199860811, b);
 }
 
 export function StartServers(): $CancellablePromise<void> {

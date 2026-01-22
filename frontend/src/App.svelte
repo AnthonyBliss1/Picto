@@ -14,7 +14,6 @@
     try {
       isHost = true;
       roomChoice = "create_room";
-      await Picto.SetIsHost(isHost);
 
       await Picto.SetCurrentRoom(null, isHost);
       hasRoom = true;
