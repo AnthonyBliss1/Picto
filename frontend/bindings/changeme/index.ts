@@ -4,4 +4,4 @@
 import * as Picto from "./picto.js";
 export { Picto };
 
-export { Room } from "./models.js";
+export { Message, Point, Room } from "./models.js";

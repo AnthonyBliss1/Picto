@@ -5,6 +5,72 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
+export class Message {
+  "action": string;
+  "phase": string;
+  "points": Point[];
+  "strokeWidth": number;
+  "color": string;
+
+  /** Creates a new Message instance. */
+  constructor($$source: Partial<Message> = {}) {
+    if (!("action" in $$source)) {
+      this["action"] = "";
+    }
+    if (!("phase" in $$source)) {
+      this["phase"] = "";
+    }
+    if (!("points" in $$source)) {
+      this["points"] = [];
+    }
+    if (!("strokeWidth" in $$source)) {
+      this["strokeWidth"] = 0;
+    }
+    if (!("color" in $$source)) {
+      this["color"] = "";
+    }
+
+    Object.assign(this, $$source);
+  }
+
+  /**
+   * Creates a new Message instance from a string or object.
+   */
+  static createFrom($$source: any = {}): Message {
+    const $$createField2_0 = $$createType1;
+    let $$parsedSource = typeof $$source === "string" ? JSON.parse($$source) : $$source;
+    if ("points" in $$parsedSource) {
+      $$parsedSource["points"] = $$createField2_0($$parsedSource["points"]);
+    }
+    return new Message($$parsedSource as Partial<Message>);
+  }
+}
+
+export class Point {
+  "x": number;
+  "y": number;
+
+  /** Creates a new Point instance. */
+  constructor($$source: Partial<Point> = {}) {
+    if (!("x" in $$source)) {
+      this["x"] = 0;
+    }
+    if (!("y" in $$source)) {
+      this["y"] = 0;
+    }
+
+    Object.assign(this, $$source);
+  }
+
+  /**
+   * Creates a new Point instance from a string or object.
+   */
+  static createFrom($$source: any = {}): Point {
+    let $$parsedSource = typeof $$source === "string" ? JSON.parse($$source) : $$source;
+    return new Point($$parsedSource as Partial<Point>);
+  }
+}
+
 export class Room {
   "hostname": string;
   "addr": string;
@@ -37,3 +103,7 @@ export class Room {
     return new Room($$parsedSource as Partial<Room>);
   }
 }
+
+// Private type creation functions
+const $$createType0 = Point.createFrom;
+const $$createType1 = $Create.Array($$createType0);

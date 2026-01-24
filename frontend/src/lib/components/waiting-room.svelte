@@ -21,22 +21,18 @@
 
       session.websocket = new WebSocket(session.room.url);
 
-      session.websocket.addEventListener("open", (event: WebSocketEventMap) => {
+      session.websocket.addEventListener("open", (event: Event) => {
         console.log("WebSocket Connection Established: ", event);
         session.connected = true;
       });
 
-      session.websocket.addEventListener("error", (event: WebSocketEventMap) => {
+      session.websocket.addEventListener("error", (event: Event) => {
         console.log("Websocket Error: ", event);
       });
 
-      session.websocket.addEventListener("close", (event: WebSocketEventMap) => {
+      session.websocket.addEventListener("close", (event: CloseEvent) => {
         console.log("WebSocket Connection Closed: ", event);
         closeSession(session);
-      });
-
-      session.websocket.addEventListener("message", (event: WebSocketEventMap) => {
-        console.log("Message Received: ", event);
       });
     } else {
       console.error("No room to connect to");

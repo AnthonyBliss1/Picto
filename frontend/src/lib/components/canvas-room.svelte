@@ -1,13 +1,18 @@
 <script lang="ts">
   import { closeSession, type Session } from "$lib/picto-sessions";
-  import { Picto, Room } from "../../../bindings/changeme";
+  import { Message, Picto, Room } from "../../../bindings/changeme";
   import { onMount } from "svelte";
 
-  let { session } = $props<{ session: Session }>();
+  let { session = $bindable<Session>() } = $props<{ session: Session }>();
 
   let room: Room | null = $state(null);
+
   let canvasEl: HTMLCanvasElement | null = $state(null);
+  let remoteCanvas: HTMLCanvasElement | null = $state(null);
+
   let ctx: CanvasRenderingContext2D | null = $state(null);
+  let remoteCtx: CanvasRenderingContext2D | null = $state(null);
+
   let cleanupCanvas: (() => void) | undefined;
   let didInit: boolean = $state(false);
 
@@ -38,7 +43,52 @@
     }
   }
 
-  function applyStrokeStyle() {
+  session.websocket.addEventListener("message", (event: MessageEvent) => {
+    console.log("Message Received: ", event);
+
+    const message = JSON.parse(event.data) as Message;
+
+    if (!message) {
+      console.error("Failed to parse JSON, incorrect shape");
+    }
+
+    switch (message.action) {
+      case "draw":
+        handleRemoteDrawing(message);
+
+      case "clear":
+        clearCanvas();
+
+      default:
+        return;
+    }
+  });
+
+  async function handleRemoteDrawing(message: Message) {
+    await applyRemoteStrokeStyle(message);
+
+    if (message.points.length === 0) return;
+
+    for (const p of message.points) {
+      if (!remoteCtx) return;
+
+      remoteCtx.beginPath();
+      remoteCtx.moveTo(p.x, p.y);
+      remoteCtx.lineTo(p.x, p.y);
+      remoteCtx.stroke();
+      remoteCtx.closePath();
+    }
+    applyStrokeStyle(remoteCtx);
+  }
+
+  async function applyRemoteStrokeStyle(message: Message) {
+    if (!remoteCtx) return;
+
+    remoteCtx.lineWidth = message.strokeWidth;
+    remoteCtx.strokeStyle = color;
+  }
+
+  function applyStrokeStyle(ctx: CanvasRenderingContext2D | null) {
     if (!ctx) return;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
@@ -93,18 +143,20 @@
   }
 
   function setupCanvas() {
-    if (!canvasEl) {
-      console.error("No canvasEl... can't setupCanvas");
+    if (!canvasEl || !remoteCanvas) {
+      console.error("No canvases... can't setupCanvas");
       return;
     }
 
     ctx = canvasEl.getContext("2d");
-    if (!ctx) return;
+    remoteCtx = remoteCanvas.getContext("2d");
+
+    if (!ctx || !remoteCtx) return;
 
     didInit = true;
 
     const resize = () => {
-      if (!canvasEl || !ctx) return;
+      if (!canvasEl || !ctx || !remoteCanvas || !remoteCtx) return;
 
       const rect = canvasEl.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
@@ -113,10 +165,14 @@
       canvasEl.width = Math.max(1, Math.floor(rect.width * dpr));
       canvasEl.height = Math.max(1, Math.floor(rect.height * dpr));
 
+      remoteCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      remoteCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+
       // Draw using CSS pixel coordinates
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      remoteCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      applyStrokeStyle();
+      applyStrokeStyle(ctx);
     };
 
     const ro = new ResizeObserver(resize);
@@ -137,7 +193,7 @@
   });
 
   $effect(() => {
-    applyStrokeStyle();
+    applyStrokeStyle(ctx);
   });
 
   onMount(() => {
@@ -148,6 +204,7 @@
 {#if room}
   <div class="relative h-full w-full">
     <!--> Canvas Object to handle drawing <--->
+    <canvas class="absolute inset-0 h-full w-full" bind:this={remoteCanvas}></canvas>
     <canvas
       class="bg-background absolute z-0 h-full w-full"
       bind:this={canvasEl}

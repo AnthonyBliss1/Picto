@@ -160,10 +160,21 @@ func (p *Picto) StartServers() (ok bool, err error) {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 type Message struct {
-	Action      string      `json:"action"`
-	Points      map[int]int `json:"points"`
-	StrokeWidth int         `json:"strokeWidth"`
-	Color       string      `json:"color"`
+	Action      string  `json:"action"`
+	Phase       string  `json:"phase"`
+	Points      []Point `json:"points"`
+	StrokeWidth int     `json:"strokeWidth"`
+	Color       string  `json:"color"`
+}
+
+type Point struct {
+	X float32 `json:"x"`
+	Y float32 `json:"y"`
+}
+
+func (p *Picto) PrintMessage(msg *Message) string {
+	b, _ := json.MarshalIndent(msg, "", "  ")
+	return string(b)
 }
 
 type Client struct {

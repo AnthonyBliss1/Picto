@@ -33,6 +33,10 @@ export function MDNSLookup(): $CancellablePromise<void> {
   return $Call.ByID(2735963699);
 }
 
+export function PrintMessage(msg: $models.Message | null): $CancellablePromise<string> {
+  return $Call.ByID(3441680393, msg);
+}
+
 export function SetCurrentRoom(
   r: $models.Room | null,
   isUserHost: boolean,

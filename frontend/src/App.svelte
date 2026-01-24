@@ -66,5 +66,5 @@
 {:else if phase === "waiting"}
   <WaitingRoom bind:session />
 {:else if phase === "canvas"}
-  <CanvasRoom {session} />
+  <CanvasRoom bind:session />
 {/if}
