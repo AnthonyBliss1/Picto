@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { closeSession, type Session } from "$lib/picto-sessions";
   import { Picto, Room } from "../../../bindings/changeme";
   import { onMount } from "svelte";
 
-  let { isHost = $bindable<boolean>(false) } = $props<{ isHost: boolean }>();
-  let room: Room | null = $state(null);
+  let { session } = $props<{ session: Session }>();
 
+  let room: Room | null = $state(null);
   let canvasEl: HTMLCanvasElement | null = $state(null);
   let ctx: CanvasRenderingContext2D | null = $state(null);
   let cleanupCanvas: (() => void) | undefined;
@@ -16,21 +17,23 @@
 
   let isEraser = $state(false);
 
+  document.addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key === "m") {
+      console.log("M Key Pressed!");
+      closeSession(session);
+    }
+
+    if (event.key === " ") {
+      console.log("Space Key Pressed!");
+      clearCanvas();
+    }
+  });
+
   async function getCurrentRoom() {
     try {
       room = await Picto.GetCurrentroom();
     } catch (error) {
-      console.log(error);
-      return;
-    }
-  }
-
-  // If Host Start MDNS (for discovery) and WS (for communication)
-  async function startServers() {
-    try {
-      await Picto.StartServers(); // this starts MDNS AND WS servers
-    } catch (error) {
-      console.log(error);
+      console.error(error);
       return;
     }
   }
@@ -52,7 +55,7 @@
 
   function startDraw(e: PointerEvent) {
     if (!ctx || !canvasEl) {
-      console.log("No canvasEL or ctx...");
+      console.error("No canvasEL or ctx...");
       return;
     }
 
@@ -91,7 +94,7 @@
 
   function setupCanvas() {
     if (!canvasEl) {
-      console.log("No canvasEl... can't setupCanvas");
+      console.error("No canvasEl... can't setupCanvas");
       return;
     }
 
@@ -139,10 +142,6 @@
 
   onMount(() => {
     getCurrentRoom();
-
-    if (isHost) {
-      startServers();
-    }
   });
 </script>
 

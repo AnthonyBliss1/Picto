@@ -33,9 +33,9 @@ type Picto struct {
 	AvailableRooms []Room       `json:"availableRooms"`
 	CurrentRoom    *Room        `json:"currentRoom"`
 	MDNSServer     *mdns.Server `json:"mdnsServer"` // ? might remove
-
-	Hub *Hub `json:"hub"`
-	Mu  sync.Mutex
+	WsServer       *http.Server `json:"sServer"`
+	Hub            *Hub         `json:"hub"`
+	Mu             sync.Mutex
 }
 
 func init() {
@@ -65,18 +65,18 @@ func (p *Picto) GetCurrentroom() *Room {
 	return p.CurrentRoom
 }
 
-func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
+func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) (ok bool, err error) {
 	if isUserHost {
 
 		hostName, err := os.Hostname()
 		if err != nil {
 			slog.Error("Failed to get user hostName", "Error", err)
-			return err
+			return false, err
 		}
 
-		url := fmt.Sprintf("ws://%s:%d/ws", "0.0.0.0", 8000)
+		url := fmt.Sprintf("ws://%s:%d/ws", "127.0.0.1", 8000)
 
-		userHost := Room{HostName: hostName, Addr: "0.0.0.0", Port: 8000, URL: url}
+		userHost := Room{HostName: hostName, Addr: "127.0.0.1", Port: 8000, URL: url}
 		p.CurrentRoom = &userHost
 		p.Hub = NewHub() // assign a hub for the host
 
@@ -84,7 +84,7 @@ func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) error {
 		p.CurrentRoom = r
 	}
 
-	return nil
+	return true, nil
 }
 
 func (p *Picto) IsHost() bool {
@@ -137,7 +137,7 @@ func (p *Picto) MDNSLookup() error {
 	return nil
 }
 
-func (p *Picto) StartServers() error {
+func (p *Picto) StartServers() (ok bool, err error) {
 	hostName, _ := os.Hostname()
 
 	info := []string{"Picto Server"}
@@ -146,16 +146,14 @@ func (p *Picto) StartServers() error {
 	slog.Debug("Starting MDNS Server advertising service on :8000")
 	mdnsSrv, err := mdns.NewServer(&mdns.Config{Zone: service})
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	p.MDNSServer = mdnsSrv
 
-	go func() {
-		p.StartWsServer()
-	}()
+	p.StartWsServer()
 
-	return nil
+	return true, nil
 }
 
 // Handling WS Server - Client, Hub, and Messages
@@ -227,14 +225,23 @@ func (p *Picto) StartWsServer() {
 		ServeWs(p.Hub, w, r)
 	})
 
-	server := &http.Server{
+	p.WsServer = &http.Server{
 		Addr:    "0.0.0.0:8000",
 		Handler: mux,
 	}
 
 	slog.Debug("Starting WebSocket Server on :8000")
-	if err := server.ListenAndServe(); err != nil {
-		slog.Error("Server shutdown error", "Error", err)
+	go func() {
+		if err := p.WsServer.ListenAndServe(); err != nil {
+			slog.Error("Server shutdown error", "Error", err)
+		}
+	}()
+}
+
+func (p *Picto) StopServers() {
+	if p.WsServer != nil {
+		p.WsServer.Close()
+		p.MDNSServer.Shutdown()
 	}
 }
 

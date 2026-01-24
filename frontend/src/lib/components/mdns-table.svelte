@@ -6,11 +6,11 @@
   import Refresh from "@lucide/svelte/icons/refresh-ccw";
   import { Picto } from "../../../bindings/changeme";
   import { Room } from "../../../bindings/changeme/models";
+  import { closeSession, type Session } from "$lib/picto-sessions";
 
-  type RoomChoice = "create_room" | "join_room" | null;
+  let { session = $bindable<Session>() } = $props<{ session: Session }>();
 
   let availRooms: Room[] = $state([]);
-  let { roomChoice = $bindable<RoomChoice>("join_room") } = $props<{ roomChoice: RoomChoice }>();
 
   async function getRooms() {
     try {
@@ -19,13 +19,21 @@
       await Picto.MDNSLookup();
       availRooms = await Picto.GetAvailableRooms();
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return;
     }
   }
 
-  function onBack() {
-    roomChoice = null;
+  async function onJoinRoom(room: Room) {
+    try {
+      const ok = await Picto.SetCurrentRoom(room, false);
+
+      if (ok) {
+        session.hasRoom = true;
+      }
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   onMount(() => {
@@ -71,12 +79,20 @@
                 <div class="truncate font-medium">{room.hostname}</div>
               </div>
 
-              <Button class="h-10 px-4" variant="outline">Join</Button>
+              <Button class="h-10 px-4" variant="outline" onclick={void onJoinRoom(room)}
+                >Join</Button
+              >
             </div>
           {/each}
         </div>
       {/if}
     </div>
   </div>
-  <Button class="p-5 text-lg" variant="outline" onclick={onBack}>Back</Button>
+  <Button
+    class="p-5 text-lg"
+    variant="outline"
+    onclick={() => {
+      closeSession(session);
+    }}>Back</Button
+  >
 </div>

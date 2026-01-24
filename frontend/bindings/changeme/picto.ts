@@ -36,16 +36,20 @@ export function MDNSLookup(): $CancellablePromise<void> {
 export function SetCurrentRoom(
   r: $models.Room | null,
   isUserHost: boolean,
-): $CancellablePromise<void> {
+): $CancellablePromise<boolean> {
   return $Call.ByID(801489685, r, isUserHost);
 }
 
-export function StartServers(): $CancellablePromise<void> {
+export function StartServers(): $CancellablePromise<boolean> {
   return $Call.ByID(2711609535);
 }
 
 export function StartWsServer(): $CancellablePromise<void> {
   return $Call.ByID(1821117296);
+}
+
+export function StopServers(): $CancellablePromise<void> {
+  return $Call.ByID(1291517857);
 }
 
 export function String(): $CancellablePromise<string> {
