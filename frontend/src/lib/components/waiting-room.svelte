@@ -32,7 +32,10 @@
 
       session.websocket.addEventListener("close", (event: CloseEvent) => {
         console.log("WebSocket Connection Closed: ", event);
-        closeSession(session);
+
+        if (event.wasClean) {
+          closeSession(session);
+        }
       });
     } else {
       console.error("No room to connect to");

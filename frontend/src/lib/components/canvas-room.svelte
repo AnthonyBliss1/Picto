@@ -1,6 +1,6 @@
 <script lang="ts">
   import { closeSession, type Session } from "$lib/picto-sessions";
-  import { Message, Picto, Room } from "../../../bindings/changeme";
+  import { Message, Picto, Point, Room } from "../../../bindings/changeme";
   import { onMount } from "svelte";
 
   let { session = $bindable<Session>() } = $props<{ session: Session }>();
@@ -21,6 +21,14 @@
   let lineWidth = $state(10);
 
   let isEraser = $state(false);
+
+  let pendingPoints: Point[] = [];
+  let lastSentPoint: Point | null = null;
+  let lastPoint: Point | null = null;
+
+  let flushScheduled = false;
+  const FLUSH_INTERVAL_MS = 16;
+  let lastFlushAt = 0;
 
   document.addEventListener("keydown", (event: KeyboardEvent) => {
     if (event.key === "m") {
@@ -55,37 +63,79 @@
     switch (message.action) {
       case "draw":
         handleRemoteDrawing(message);
+        break;
 
       case "clear":
         clearCanvas();
+        break;
 
       default:
         return;
     }
   });
 
-  async function handleRemoteDrawing(message: Message) {
-    await applyRemoteStrokeStyle(message);
-
-    if (message.points.length === 0) return;
-
-    for (const p of message.points) {
-      if (!remoteCtx) return;
-
-      remoteCtx.beginPath();
-      remoteCtx.moveTo(p.x, p.y);
-      remoteCtx.lineTo(p.x, p.y);
-      remoteCtx.stroke();
-      remoteCtx.closePath();
-    }
-    applyStrokeStyle(remoteCtx);
-  }
-
-  async function applyRemoteStrokeStyle(message: Message) {
+  function handleRemoteDrawing(message: Message) {
     if (!remoteCtx) return;
 
+    applyRemoteStrokeStyle(message);
+
+    const pts = message.points;
+    if (!pts || pts.length === 0) return;
+
+    const phase = message.phase ?? "move";
+
+    if (phase === "start") {
+      // anchor
+      lastPoint = pts[0];
+
+      // draw a dot so taps appear
+      remoteCtx.beginPath();
+      remoteCtx.moveTo(pts[0].x, pts[0].y);
+      remoteCtx.lineTo(pts[0].x + 0.01, pts[0].y + 0.01);
+      remoteCtx.stroke();
+      remoteCtx.closePath();
+      return;
+    }
+
+    if (phase === "move") {
+      if (!lastPoint) lastPoint = pts[0];
+
+      remoteCtx.beginPath();
+      remoteCtx.moveTo(lastPoint.x, lastPoint.y);
+
+      for (const p of pts) remoteCtx.lineTo(p.x, p.y);
+
+      remoteCtx.stroke();
+      remoteCtx.closePath();
+
+      // update anchor to last point in this batch
+      lastPoint = pts[pts.length - 1];
+      return;
+    }
+
+    if (phase === "end") {
+      // draw final segment if there is an anchor
+      if (lastPoint) {
+        remoteCtx.beginPath();
+        remoteCtx.moveTo(lastPoint.x, lastPoint.y);
+        for (const p of pts) remoteCtx.lineTo(p.x, p.y);
+        remoteCtx.stroke();
+        remoteCtx.closePath();
+      }
+
+      // clear anchor for next line
+      lastPoint = null;
+      return;
+    }
+  }
+
+  function applyRemoteStrokeStyle(message: Message) {
+    if (!remoteCtx) return;
+
+    remoteCtx.lineJoin = "round";
+    remoteCtx.lineCap = "round";
     remoteCtx.lineWidth = message.strokeWidth;
-    remoteCtx.strokeStyle = color;
+    remoteCtx.strokeStyle = message.color;
   }
 
   function applyStrokeStyle(ctx: CanvasRenderingContext2D | null) {
@@ -95,6 +145,51 @@
     ctx.lineWidth = lineWidth;
     ctx.strokeStyle = color;
     ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+  }
+
+  function wsSend(msg: Message) {
+    if (!session.websocket || session.websocket.readyState !== WebSocket.OPEN) return;
+    session.websocket.send(JSON.stringify(msg));
+  }
+
+  function queuePoint(p: Point) {
+    pendingPoints.push(p);
+    scheduleFlush();
+  }
+
+  function scheduleFlush() {
+    if (flushScheduled) return;
+    flushScheduled = true;
+
+    requestAnimationFrame(() => {
+      flushScheduled = false;
+      flushMoveBatch();
+    });
+  }
+
+  function flushMoveBatch(force = false) {
+    const now = performance.now();
+    if (!force && now - lastFlushAt < FLUSH_INTERVAL_MS) {
+      scheduleFlush();
+      return;
+    }
+
+    if (pendingPoints.length === 0) return;
+
+    const pts = pendingPoints;
+    pendingPoints = [];
+    lastFlushAt = now;
+    lastSentPoint = pts[pts.length - 1];
+
+    const msg: Message = {
+      action: "draw",
+      phase: "move",
+      points: pts,
+      strokeWidth: lineWidth,
+      color: color,
+    };
+
+    wsSend(msg);
   }
 
   function getPoint(e: PointerEvent) {
@@ -113,9 +208,24 @@
     isDrawing = true;
     console.log("Drawing...");
 
+    pendingPoints = [];
+    lastSentPoint = null;
+
     const p = getPoint(e);
+    lastPoint = p;
+
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
+
+    const msg: Message = {
+      action: "draw",
+      phase: "start",
+      points: [p],
+      strokeWidth: lineWidth,
+      color: color,
+    };
+
+    wsSend(msg);
   }
 
   function moveDraw(e: PointerEvent) {
@@ -124,15 +234,37 @@
     const p = getPoint(e);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
+
+    queuePoint(p);
   }
 
   function endDraw(e: PointerEvent) {
     if (!ctx || !canvasEl) return;
 
     isDrawing = false;
+
     try {
       canvasEl.releasePointerCapture(e.pointerId);
     } catch {}
+
+    flushMoveBatch(true);
+
+    const p = getPoint(e);
+
+    const msg: Message = {
+      action: "draw",
+      phase: "end",
+      points: [p],
+      strokeWidth: lineWidth,
+      color: color,
+    };
+
+    wsSend(msg);
+
+    pendingPoints = [];
+    lastSentPoint = null;
+    lastPoint = null;
+
     ctx.closePath();
   }
 
@@ -202,18 +334,23 @@
 </script>
 
 {#if room}
-  <div class="relative h-full w-full">
+  <div class="bg-background relative h-full w-full">
     <!--> Canvas Object to handle drawing <--->
-    <canvas class="absolute inset-0 h-full w-full" bind:this={remoteCanvas}></canvas>
-    <canvas
-      class="bg-background absolute z-0 h-full w-full"
-      bind:this={canvasEl}
-      onpointerdown={startDraw}
-      onpointermove={moveDraw}
-      onpointerup={endDraw}
-      onpointercancel={endDraw}
-      onpointerleave={endDraw}
-    ></canvas>
+    <div class="absolute inset-0">
+      <canvas
+        class="pointer-events-none absolute inset-0 z-0 h-full w-full"
+        bind:this={remoteCanvas}
+      ></canvas>
+      <canvas
+        class="absolute inset-0 z-10 h-full w-full bg-transparent"
+        bind:this={canvasEl}
+        onpointerdown={startDraw}
+        onpointermove={moveDraw}
+        onpointerup={endDraw}
+        onpointercancel={endDraw}
+        onpointerleave={endDraw}
+      ></canvas>
+    </div>
 
     <!--> Top Toolbar <--->
     <div

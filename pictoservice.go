@@ -266,7 +266,7 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		slog.Error("Error upgrading Http to WS", "Error", err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan Message)}
+	client := &Client{hub: hub, conn: conn, send: make(chan Message, 256)}
 	client.hub.Register <- client
 
 	go client.writePump()
