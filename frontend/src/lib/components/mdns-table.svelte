@@ -3,7 +3,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { TriangleAlert } from "lucide-svelte";
   import { onMount } from "svelte";
-  import Refresh from "@lucide/svelte/icons/refresh-ccw";
+  import Refresh from "@lucide/svelte/icons/refresh-cw";
   import { Picto } from "../../../bindings/changeme";
   import { Room } from "../../../bindings/changeme/models";
   import { closeSession, type Session } from "$lib/picto-sessions";
@@ -11,14 +11,20 @@
   let { session = $bindable<Session>() } = $props<{ session: Session }>();
 
   let availRooms: Room[] = $state([]);
+  let refreshing: boolean = $state(false);
 
   async function getRooms() {
     try {
       console.log("Searching for rooms...");
 
+      refreshing = true;
+
       await Picto.MDNSLookup();
       availRooms = await Picto.GetAvailableRooms();
+
+      refreshing = false;
     } catch (error) {
+      refreshing = false;
       console.error(error);
       return;
     }
@@ -42,7 +48,7 @@
 </script>
 
 <div class="bg-background grid min-h-screen place-items-center p-6">
-  <div class="border-border w-full max-w-[420px] rounded-md border p-8">
+  <div class="border-border w-full max-w-[500px] translate-y-20 rounded-md border p-8">
     <div class="relative">
       <h1 class="text-center text-2xl font-semibold underline underline-offset-8">
         Select a room...
@@ -52,15 +58,18 @@
         class="absolute top-1/2 right-0 -translate-y-1/2"
         size="icon"
         variant="ghost"
-        onclick={getRooms}
+        disabled={refreshing}
+        onclick={() => {
+          getRooms();
+        }}
       >
-        <Refresh class="h-5 w-5" />
+        <Refresh class={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
       </Button>
     </div>
 
     <div class="mt-6">
       {#if availRooms.length === 0}
-        <Empty.Root class="border-border rounded-xl border border-dashed p-6">
+        <Empty.Root class="p-6">
           <Empty.Header>
             <Empty.Media variant="icon">
               <TriangleAlert />

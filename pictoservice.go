@@ -176,6 +176,7 @@ type Message struct {
 	Points      []Point `json:"points"`
 	StrokeWidth int     `json:"strokeWidth"`
 	Color       string  `json:"color"`
+	NumClients  int     `json:"numClients"`
 }
 
 type Point struct {
@@ -210,27 +211,33 @@ func NewHub() *Hub {
 	}
 }
 
+func (h *Hub) broadcast(msg Message) {
+	for client := range h.Clients {
+		select {
+		case client.send <- msg:
+		default:
+			close(client.send)
+			delete(h.Clients, client)
+		}
+	}
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.Register:
 			h.Clients[client] = true
+			h.broadcast(Message{Action: "new-connection", NumClients: len(h.Clients)})
 
 		case client := <-h.Unregister:
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
 				close(client.send)
+				h.broadcast(Message{Action: "closed-connection", NumClients: len(h.Clients)})
 			}
 
 		case msg := <-h.Broadcast:
-			for client := range h.Clients {
-				select {
-				case client.send <- msg:
-				default:
-					close(client.send)
-					delete(h.Clients, client)
-				}
-			}
+			h.broadcast(msg)
 		}
 	}
 }
@@ -265,6 +272,14 @@ func (p *Picto) StopServers() {
 		p.WsServer.Close()
 		p.MDNSServer.Shutdown()
 	}
+}
+
+func (p *Picto) GetNumClients() (ok bool, size int) {
+	if p.Hub == nil {
+		return false, 0
+	}
+
+	return true, len(p.Hub.Clients)
 }
 
 var upgrader = websocket.Upgrader{

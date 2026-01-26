@@ -33,7 +33,8 @@
       session.websocket.addEventListener("close", (event: CloseEvent) => {
         console.log("WebSocket Connection Closed: ", event);
 
-        if (event.wasClean) {
+        // handling unintentional connection close
+        if (event.wasClean && session.websocket) {
           closeSession(session);
         }
       });

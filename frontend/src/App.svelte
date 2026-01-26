@@ -46,7 +46,7 @@
 </script>
 
 {#if phase === "home"}
-  <div class="flex min-h-screen -translate-y-15 flex-col items-center justify-center gap-10">
+  <div class="flex min-h-screen -translate-y-10 flex-col items-center justify-center gap-10">
     <img src="/Picto-Svelte.svg" width="200" height="150" alt="Picto-Svelte logo" />
     <h1 class="text-4xl">Welcome to Picto</h1>
 

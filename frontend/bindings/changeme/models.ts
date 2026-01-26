@@ -11,6 +11,7 @@ export class Message {
   "points": Point[];
   "strokeWidth": number;
   "color": string;
+  "numClients": number;
 
   /** Creates a new Message instance. */
   constructor($$source: Partial<Message> = {}) {
@@ -28,6 +29,9 @@ export class Message {
     }
     if (!("color" in $$source)) {
       this["color"] = "";
+    }
+    if (!("numClients" in $$source)) {
+      this["numClients"] = 0;
     }
 
     Object.assign(this, $$source);

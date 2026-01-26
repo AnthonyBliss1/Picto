@@ -25,6 +25,10 @@ export function GetCurrentroom(): $CancellablePromise<$models.Room | null> {
   });
 }
 
+export function GetNumClients(): $CancellablePromise<[boolean, number]> {
+  return $Call.ByID(656395661);
+}
+
 export function IsHost(): $CancellablePromise<boolean> {
   return $Call.ByID(1427711681);
 }

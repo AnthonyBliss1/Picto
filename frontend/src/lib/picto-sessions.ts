@@ -12,21 +12,25 @@ export type Session = {
 };
 
 export async function closeSession(session: Session) {
+  console.log("Closing Session...");
+  session.websocket?.close();
+
+  // avoid triping null check on close events once server shutsdown
+  session.websocket = null;
+
   if (session.isHost) {
     try {
+      console.log("Shutting down servers...");
       await Picto.StopServers();
     } catch (error) {
       console.error(error);
     }
   }
 
-  console.log("Closing Session...");
-
-  // Reset Session on cancel
+  // reset rest of session fields
   session.roomChoice = null;
   session.hasRoom = false;
   session.connected = false;
   session.isHost = false;
-  session.websocket = null;
   session.room = null;
 }

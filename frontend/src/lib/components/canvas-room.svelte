@@ -6,6 +6,7 @@
   let { session = $bindable<Session>() } = $props<{ session: Session }>();
 
   let room: Room | null = $state(null);
+  let numClients: number = $state(0);
 
   let canvasEl: HTMLCanvasElement | null = $state(null);
   let remoteCanvas: HTMLCanvasElement | null = $state(null);
@@ -45,6 +46,7 @@
         points: [],
         strokeWidth: lineWidth,
         color: color,
+        numClients: 0,
       };
 
       wsSend(msg);
@@ -76,6 +78,14 @@
 
       case "clear":
         clearCanvas();
+        break;
+
+      case "new-connection":
+        numClients = message.numClients;
+        break;
+
+      case "closed-connection":
+        numClients = message.numClients;
         break;
 
       default:
@@ -196,6 +206,7 @@
       points: pts,
       strokeWidth: lineWidth,
       color: color,
+      numClients: 0,
     };
 
     wsSend(msg);
@@ -232,6 +243,7 @@
       points: [p],
       strokeWidth: lineWidth,
       color: color,
+      numClients: 0,
     };
 
     wsSend(msg);
@@ -266,6 +278,7 @@
       points: [p],
       strokeWidth: lineWidth,
       color: color,
+      numClients: 0,
     };
 
     wsSend(msg);
@@ -380,7 +393,7 @@
 
       <div class="flex flex-row items-center gap-20">
         <p class="italic">Host: {room.hostname}</p>
-        <p>Users: ?</p>
+        <p>Users: {numClients}</p>
       </div>
     </div>
 
