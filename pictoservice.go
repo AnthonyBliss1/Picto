@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -15,6 +17,8 @@ import (
 )
 
 type RoomChoice string
+
+var LanIP net.IP
 
 const (
 	RoomChoiceCreate RoomChoice = "create_room"
@@ -39,8 +43,15 @@ type Picto struct {
 }
 
 func init() {
+	var err error
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	slog.SetDefault(logger)
+
+	LanIP, err = LANIPv4()
+	if err != nil {
+		log.Fatalf("Could not get LAN IP: %f", err)
+	}
 }
 
 func (p *Picto) String() string {
@@ -74,9 +85,9 @@ func (p *Picto) SetCurrentRoom(r *Room, isUserHost bool) (ok bool, err error) {
 			return false, err
 		}
 
-		url := fmt.Sprintf("ws://%s:%d/ws", "127.0.0.1", 8000)
+		url := fmt.Sprintf("ws://%s:%d/ws", LanIP.String(), 8000)
 
-		userHost := Room{HostName: hostName, Addr: "127.0.0.1", Port: 8000, URL: url}
+		userHost := Room{HostName: hostName, Addr: LanIP.String(), Port: 8000, URL: url}
 		p.CurrentRoom = &userHost
 		p.Hub = NewHub() // assign a hub for the host
 
@@ -141,7 +152,7 @@ func (p *Picto) StartServers() (ok bool, err error) {
 	hostName, _ := os.Hostname()
 
 	info := []string{"Picto Server"}
-	service, _ := mdns.NewMDNSService(hostName, "_pictosvelte._tcp", "", "", 8000, nil, info)
+	service, _ := mdns.NewMDNSService(hostName, "_pictosvelte._tcp", "", "", 8000, []net.IP{LanIP}, info)
 
 	slog.Debug("Starting MDNS Server advertising service on :8000")
 	mdnsSrv, err := mdns.NewServer(&mdns.Config{Zone: service})
@@ -237,7 +248,7 @@ func (p *Picto) StartWsServer() {
 	})
 
 	p.WsServer = &http.Server{
-		Addr:    "0.0.0.0:8000",
+		Addr:    LanIP.String() + ":8000",
 		Handler: mux,
 	}
 
