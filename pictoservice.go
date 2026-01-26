@@ -18,7 +18,10 @@ import (
 
 type RoomChoice string
 
-var LanIP net.IP
+var (
+	LanIP    net.IP
+	hostName string
+)
 
 const (
 	RoomChoiceCreate RoomChoice = "create_room"
@@ -50,7 +53,12 @@ func init() {
 
 	LanIP, err = LANIPv4()
 	if err != nil {
-		log.Fatalf("Could not get LAN IP: %f", err)
+		log.Fatalf("Could not get LAN IP: %q", err)
+	}
+
+	hostName, err = os.Hostname()
+	if err != nil {
+		log.Fatalf("Could not get hostName: %q", err)
 	}
 }
 
@@ -149,8 +157,6 @@ func (p *Picto) MDNSLookup() error {
 }
 
 func (p *Picto) StartServers() (ok bool, err error) {
-	hostName, _ := os.Hostname()
-
 	info := []string{"Picto Server"}
 	service, _ := mdns.NewMDNSService(hostName, "_pictosvelte._tcp", "", "", 8000, []net.IP{LanIP}, info)
 
@@ -200,6 +206,7 @@ type Hub struct {
 	Broadcast  chan Message
 	Register   chan *Client
 	Unregister chan *Client
+	Shutdown   chan struct{}
 }
 
 func NewHub() *Hub {
@@ -208,6 +215,7 @@ func NewHub() *Hub {
 		Broadcast:  make(chan Message),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
+		Shutdown:   make(chan struct{}),
 	}
 }
 
@@ -238,6 +246,9 @@ func (h *Hub) Run() {
 
 		case msg := <-h.Broadcast:
 			h.broadcast(msg)
+
+		case <-h.Shutdown:
+			h.broadcast(Message{Action: "server-shutdown"})
 		}
 	}
 }
@@ -271,6 +282,10 @@ func (p *Picto) StopServers() {
 	if p.WsServer != nil {
 		p.WsServer.Close()
 		p.MDNSServer.Shutdown()
+	}
+
+	if p.Hub != nil {
+		close(p.Hub.Shutdown)
 	}
 }
 

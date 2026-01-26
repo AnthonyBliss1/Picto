@@ -96,6 +96,10 @@
         numClients = message.numClients;
         break;
 
+      case "server-shutdown":
+        closeSession(session);
+        break;
+
       default:
         return;
     }
@@ -405,7 +409,7 @@
       </div>
 
       <div class="flex flex-row items-center gap-20">
-        <p class="italic">Host: {room.hostname}</p>
+        <p class="truncate italic">Host: {room.hostname}</p>
         <p>Users: {numClients}</p>
       </div>
     </div>
