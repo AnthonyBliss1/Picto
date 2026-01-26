@@ -5,6 +5,12 @@
 
   let { session = $bindable<Session>() } = $props<{ session: Session }>();
 
+  const Colors = {
+    white: { name: "white", hex: "#FFFFFF" },
+    red: { name: "red", hex: "#B91C1C" },
+    green: { name: "green", hex: "#15803D" },
+  };
+
   let room: Room | null = $state(null);
   let numClients: number = $state(0);
 
@@ -18,7 +24,9 @@
   let didInit: boolean = $state(false);
 
   let isDrawing = $state(false);
-  let color = $state("#ffffff");
+
+  let color = $state(Colors.white);
+
   let lineWidth = $state(10);
 
   let isEraser = $state(false);
@@ -45,7 +53,7 @@
         phase: "",
         points: [],
         strokeWidth: lineWidth,
-        color: color,
+        color: color.hex,
         numClients: 0,
       };
 
@@ -162,7 +170,7 @@
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     ctx.lineWidth = lineWidth;
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = color.hex;
     ctx.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
   }
 
@@ -205,7 +213,7 @@
       phase: "move",
       points: pts,
       strokeWidth: lineWidth,
-      color: color,
+      color: color.hex,
       numClients: 0,
     };
 
@@ -242,7 +250,7 @@
       phase: "start",
       points: [p],
       strokeWidth: lineWidth,
-      color: color,
+      color: color.hex,
       numClients: 0,
     };
 
@@ -277,7 +285,7 @@
       phase: "end",
       points: [p],
       strokeWidth: lineWidth,
-      color: color,
+      color: color.hex,
       numClients: 0,
     };
 
@@ -398,54 +406,81 @@
     </div>
 
     <!--> Bottom Draw Size Selector <--->
-    <div
-      class="bg-card border-border fixed bottom-3 left-3 z-50 flex items-center justify-end gap-10 rounded-md border px-5 py-2"
-    >
-      <svg
-        class="h-15 w-15"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        onclick={() => {
-          lineWidth = 15;
-        }}
+    <div class="fixed bottom-3 left-3 z-50 flex flex-row justify-between gap-10">
+      <div
+        class="bg-card border-border flex items-center justify-end gap-10 rounded-md border px-5 py-2"
       >
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          class={`hover:fill-blue-700 ${lineWidth === 15 ? `fill-blue-700` : `fill-white`}`}
-        />
-      </svg>
-      <svg
-        class="h-10 w-10"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        onclick={() => {
-          lineWidth = 10;
-        }}
+        <svg
+          class="h-15 w-15"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          onclick={() => {
+            lineWidth = 15;
+          }}
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            class={`hover:fill-blue-700 ${lineWidth === 15 ? `fill-blue-700` : `fill-white`}`}
+          />
+        </svg>
+        <svg
+          class="h-10 w-10"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          onclick={() => {
+            lineWidth = 10;
+          }}
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            class={`hover:fill-blue-700 ${lineWidth === 10 ? `fill-blue-700` : `fill-white`}`}
+          />
+        </svg>
+        <svg
+          class="h-5 w-5"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          onclick={() => {
+            lineWidth = 5;
+          }}
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            class={`hover:fill-blue-700 ${lineWidth === 5 ? `fill-blue-700` : `fill-white`}`}
+          />
+        </svg>
+      </div>
+      <div
+        class="bg-card border-border flex items-center justify-end gap-10 rounded-md border px-5 py-2"
       >
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          class={`hover:fill-blue-700 ${lineWidth === 10 ? `fill-blue-700` : `fill-white`}`}
-        />
-      </svg>
-      <svg
-        class="h-5 w-5"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        onclick={() => {
-          lineWidth = 5;
-        }}
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          class={`hover:fill-blue-700 ${lineWidth === 5 ? `fill-blue-700` : `fill-white`}`}
-        />
-      </svg>
+        <div
+          class={`h-10 w-10 rounded-md border-3 ${color.name === "white" ? `border-blue-700` : `border-white`} bg-white hover:border-blue-700`}
+          aria-hidden="true"
+          onclick={() => {
+            color = Colors.white;
+          }}
+        ></div>
+        <div
+          class={`h-10 w-10 rounded-md border-3 ${color.name === "red" ? `border-blue-700` : `border-red-700`} bg-red-700 hover:border-blue-700`}
+          aria-hidden="true"
+          onclick={() => {
+            color = Colors.red;
+          }}
+        ></div>
+        <div
+          class={`h-10 w-10 rounded-md border-3 ${color.name === "green" ? `border-blue-700` : `border-green-700`} bg-green-700 hover:border-blue-700`}
+          aria-hidden="true"
+          onclick={() => {
+            color = Colors.green;
+          }}
+        ></div>
+      </div>
     </div>
   </div>
 {/if}
