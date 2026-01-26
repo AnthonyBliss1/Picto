@@ -79,8 +79,12 @@
                 <div class="truncate font-medium">{room.hostname}</div>
               </div>
 
-              <Button class="h-10 px-4" variant="outline" onclick={void onJoinRoom(room)}
-                >Join</Button
+              <Button
+                class="h-10 px-4"
+                variant="outline"
+                onclick={() => {
+                  onJoinRoom(room);
+                }}>Join</Button
               >
             </div>
           {/each}

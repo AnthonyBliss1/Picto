@@ -38,7 +38,16 @@
 
     if (event.key === " ") {
       console.log("Space Key Pressed!");
-      clearCanvas();
+
+      const msg: Message = {
+        action: "clear",
+        phase: "",
+        points: [],
+        strokeWidth: lineWidth,
+        color: color,
+      };
+
+      wsSend(msg);
     }
   });
 
@@ -269,9 +278,10 @@
   }
 
   function clearCanvas() {
-    if (!ctx || !canvasEl) return;
+    if (!ctx || !canvasEl || !remoteCtx || !remoteCanvas) return;
     const { width, height } = canvasEl.getBoundingClientRect();
     ctx.clearRect(0, 0, width, height);
+    remoteCtx.clearRect(0, 0, width, height);
   }
 
   function setupCanvas() {
