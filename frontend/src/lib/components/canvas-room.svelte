@@ -1,7 +1,7 @@
 <script lang="ts">
   import { closeSession, type Session } from "$lib/picto-sessions";
   import { Message, Picto, Point, Room } from "../../../bindings/changeme";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   let { session = $bindable<Session>() } = $props<{ session: Session }>();
 
@@ -39,7 +39,7 @@
   const FLUSH_INTERVAL_MS = 16;
   let lastFlushAt = 0;
 
-  document.addEventListener("keydown", (event: KeyboardEvent) => {
+  const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "m") {
       console.log("M Key Pressed!");
       closeSession(session);
@@ -59,7 +59,7 @@
 
       wsSend(msg);
     }
-  });
+  };
 
   async function getCurrentRoom() {
     try {
@@ -361,6 +361,11 @@
 
   onMount(() => {
     getCurrentRoom();
+    document.addEventListener("keydown", onKeyDown);
+  });
+
+  onDestroy(() => {
+    document.removeEventListener("keydown", onKeyDown);
   });
 </script>
 
