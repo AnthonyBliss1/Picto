@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
-Name=Merchant.io
-Comment=A 3rd party Square management tool
+Name=Picto
+Comment=Doodling App with Websockets
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/Merchant.io %u
+Exec=/usr/local/bin/Picto %u
 Terminal=false
 Type=Application
-Icon=Merchant.io
+Icon=Picto
 Categories=Utility;
-StartupWMClass=Merchant.io
+StartupWMClass=Picto
 
  

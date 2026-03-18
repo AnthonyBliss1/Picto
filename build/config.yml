@@ -1,14 +1,14 @@
 # This file contains the configuration for this project.
 # When you update `info` or `fileAssociations`, run `wails3 task common:update:build-assets` to update the assets.
 # Note that this will overwrite any changes you have made to the assets.
-version: '3'
+version: "3"
 
 # This information is used to generate the build assets.
 info:
   companyName: "ARB Apps" # The name of the company
-  productName: "Merchant.io" # The name of the application
-  productIdentifier: "com.arb_apps.merchant" # The unique product identifier
-  description: "A 3rd party Square management tool" # The application description
+  productName: "Picto" # The name of the application
+  productIdentifier: "com.arb_apps.picto" # The unique product identifier
+  description: "Doodling App with Websockets" # The application description
   copyright: "(c) 2025, ARB Apps" # Copyright text
   comments: "Some Product Comments" # Comments
   version: "0.0.1" # The application version
@@ -73,3 +73,4 @@ fileAssociations:
 # Other data
 other:
   - name: My Other Data
+
